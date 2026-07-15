@@ -170,13 +170,38 @@
 
   button:focus-visible,textarea:focus-visible,.cell.filled:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
   @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
+
+  /* 設定 */
+  .settings-btn{
+    position:fixed;top:calc(env(safe-area-inset-top) + 14px);right:calc(env(safe-area-inset-right) + 14px);
+    width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+    color:var(--ink-soft);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+    box-shadow:var(--shadow);transition:transform .1s;z-index:40;
+  }
+  .settings-btn:active{transform:scale(.92);}
+  .sheet{max-height:88dvh;overflow-y:auto;}
+  .set-group{margin-bottom:18px;}
+  .set-label{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:8px;display:block;}
+  .set-input{
+    width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:16px;
+    font-family:inherit;color:var(--ink);background:var(--bg1);outline:none;-webkit-user-select:text;user-select:text;
+  }
+  .set-input:focus{border-color:var(--accent);}
+  .goal-presets{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;}
+  .themes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .theme-opt{border:2px solid var(--line);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;background:var(--card);transition:.15s;}
+  .theme-opt.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .theme-dots{display:flex;justify-content:center;gap:4px;margin-bottom:6px;}
+  .theme-dots span{width:16px;height:16px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.05);}
+  .theme-name{font-size:12px;color:var(--ink);font-weight:600;}
 </style>
 </head>
 <body>
 <div class="wrap">
+  <button class="settings-btn" id="settingsBtn" aria-label="設定" title="設定">⚙️</button>
   <header>
-    <h1 class="title">🎫 離職小卡</h1>
-    <p class="subtitle">受夠了就記一筆，集滿 100 點就遞辭呈</p>
+    <h1 class="title" id="cardTitle">🎫 離職小卡</h1>
+    <p class="subtitle" id="subtitle">受夠了就記一筆，集滿 100 點就遞辭呈</p>
   </header>
 
   <div id="doneBanner" class="done-banner" style="display:none">🎉 已集滿 100 點，是時候遞辭呈了！</div>
@@ -185,7 +210,7 @@
     <div class="count-row">
       <span class="count-big" id="countBig">0</span>
       <span class="count-slash">/</span>
-      <span class="count-total">100</span>
+      <span class="count-total" id="countTotal">100</span>
     </div>
     <div class="bar"><div class="bar-fill" id="barFill"></div></div>
     <div class="bar-caption" id="barCaption">還差 100 點自由</div>
@@ -223,17 +248,54 @@
 
 <script>
 const KEY = "resign-card-v1";
-const GOAL = 100;
 const PRESETS = ["開會太多","老闆雷","加班","薪水太低","同事扯後腿","政策爛","被情緒勒索","通勤累","看不到未來","被當工具人"];
+
+/* 色系（低飽和莫蘭迪，由設定切換） */
+const THEMES = {
+  mist: {name:"霧藍", bg1:"#e9f0f6",bg2:"#d4e2ee",card:"#fbfcfe",ink:"#33465a",inkSoft:"#6d8496",line:"#cedeeb",accent:"#4f86ab",accentDeep:"#3c6d90",accentSoft:"#d7e8f4",accent2:"#79b3c6",empty:"#d6e3ee",danger:"#c07f7a",sa:"rgba(79,134,171,.32)"},
+  taro: {name:"藕紫", bg1:"#f1ecf3",bg2:"#e4dcec",card:"#fdfbfe",ink:"#453a52",inkSoft:"#857a92",line:"#e0d5e8",accent:"#8f6fa8",accentDeep:"#74578c",accentSoft:"#ece0f3",accent2:"#b79ac2",empty:"#e6dcee",danger:"#bf7f86",sa:"rgba(143,111,168,.30)"},
+  sage: {name:"灰綠", bg1:"#eaf0ec",bg2:"#d9e5dd",card:"#fbfdfb",ink:"#3a4a41",inkSoft:"#74857b",line:"#d2e0d7",accent:"#6a9080",accentDeep:"#527a6a",accentSoft:"#deece4",accent2:"#9bc0ab",empty:"#d8e6dd",danger:"#c1827b",sa:"rgba(106,144,128,.30)"},
+  rose: {name:"霧粉", bg1:"#f6ecee",bg2:"#eddade",card:"#fefbfc",ink:"#52393f",inkSoft:"#927981",line:"#ecd7db",accent:"#b56f7e",accentDeep:"#965667",accentSoft:"#f4dee3",accent2:"#d199a4",empty:"#eedadf",danger:"#a85c52",sa:"rgba(181,111,126,.30)"},
+  sand: {name:"暖沙", bg1:"#f3efe8",bg2:"#e8dfd0",card:"#fefdfa",ink:"#4c4438",inkSoft:"#8c8271",line:"#e6ddcd",accent:"#b1936a",accentDeep:"#937754",accentSoft:"#efe6d6",accent2:"#cbb691",empty:"#e9e1d2",danger:"#b06a5f",sa:"rgba(177,147,106,.32)"},
+  teal: {name:"霧青", bg1:"#e7f1f1",bg2:"#d2e6e6",card:"#fafdfd",ink:"#334a4b",inkSoft:"#6b8788",line:"#cce1e1",accent:"#4d9a9c",accentDeep:"#3a7d7f",accentSoft:"#d6eeee",accent2:"#82c4c2",empty:"#d4e8e8",danger:"#c07f7a",sa:"rgba(77,154,156,.30)"}
+};
+const THEME_ORDER = ["mist","taro","sage","rose","sand","teal"];
+const DEFAULTS = { name:"離職小卡", goal:100, theme:"mist" };
 
 let state = load();
 let selectedChips = new Set();
 let justAdded = false;
 let toastTimer = null;
+let pendingRevertTheme = null;
 
 function load(){
-  try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && Array.isArray(d.entries)) return d; }catch(e){}
-  return { entries:[] };
+  let d=null;
+  try{ d = JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+  if(!d || !Array.isArray(d.entries)) d = { entries:[] };
+  d.settings = Object.assign({}, DEFAULTS, d.settings||{});
+  d.settings.goal = Math.max(1, Math.min(999, parseInt(d.settings.goal,10)||100));
+  if(!THEMES[d.settings.theme]) d.settings.theme = "mist";
+  if(typeof d.settings.name!=="string" || !d.settings.name.trim()) d.settings.name = DEFAULTS.name;
+  return d;
+}
+
+function applyTheme(key){
+  const t = THEMES[key] || THEMES.mist;
+  const r = document.documentElement.style;
+  r.setProperty('--bg1',t.bg1); r.setProperty('--bg2',t.bg2); r.setProperty('--card',t.card);
+  r.setProperty('--ink',t.ink); r.setProperty('--ink-soft',t.inkSoft); r.setProperty('--line',t.line);
+  r.setProperty('--accent',t.accent); r.setProperty('--accent-deep',t.accentDeep); r.setProperty('--accent-soft',t.accentSoft);
+  r.setProperty('--accent2',t.accent2); r.setProperty('--empty',t.empty); r.setProperty('--fill',t.accent);
+  r.setProperty('--danger',t.danger); r.setProperty('--shadow-accent',t.sa);
+  const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute('content', t.bg1);
+}
+
+function applyMeta(){
+  const s = state.settings;
+  $("cardTitle").textContent = "🎫 " + s.name;
+  $("subtitle").textContent = `受夠了就記一筆，集滿 ${s.goal} 點就遞辭呈`;
+  $("countTotal").textContent = s.goal;
+  document.title = s.name;
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
 const $ = id => document.getElementById(id);
@@ -255,22 +317,24 @@ function closeConfirm(){ $("confirmOverlay").classList.remove("show"); }
 function showToast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
 
 function render(){
-  const n = state.entries.length, done = n >= GOAL;
-  $("countBig").textContent = Math.min(n,GOAL);
-  $("barFill").style.width = Math.min(100, n/GOAL*100) + "%";
+  const G = state.settings.goal;
+  const n = state.entries.length, done = n >= G;
+  $("countBig").textContent = Math.min(n,G);
+  $("barFill").style.width = Math.min(100, n/G*100) + "%";
   $("statTotal").textContent = n;
-  $("statLeft").textContent = Math.max(0, GOAL-n);
+  $("statLeft").textContent = Math.max(0, G-n);
   let days = 0;
   if(n>0){ days = Math.max(1, Math.ceil((Date.now()-state.entries[0].ts)/86400000)); }
   $("statDays").textContent = days;
-  $("barCaption").textContent = done ? "自由達成 🕊️" : `還差 ${GOAL-n} 點自由`;
+  $("barCaption").textContent = done ? "自由達成 🕊️" : `還差 ${G-n} 點自由`;
+  $("doneBanner").textContent = `🎉 已集滿 ${G} 點，是時候遞辭呈了！`;
   $("doneBanner").style.display = done ? "block" : "none";
   const addBtn = $("addBtn");
   if(done){ addBtn.disabled=true; addBtn.textContent="✅ 可以離職了"; }
   else { addBtn.disabled=false; addBtn.textContent="＋ 記一筆"; }
 
   const grid = $("grid"); grid.innerHTML = "";
-  for(let i=0;i<GOAL;i++){
+  for(let i=0;i<G;i++){
     const c = document.createElement("div"); c.className="cell";
     if(i < n){
       c.classList.add("filled"); c.innerHTML='<span class="stamp">✕</span>';
@@ -338,13 +402,65 @@ function showDetail(i){
   });
 }
 
-function closeSheet(){ $("overlay").classList.remove("show"); }
+function closeSheet(){
+  if(pendingRevertTheme!=null){ applyTheme(pendingRevertTheme); pendingRevertTheme=null; }
+  $("overlay").classList.remove("show");
+}
+
+function openSettings(){
+  const s = state.settings;
+  let selTheme = s.theme;
+  pendingRevertTheme = s.theme; // 預覽後若取消就還原
+  const sheet = $("sheet");
+  sheet.innerHTML = `
+    <h3>⚙️ 設定</h3>
+    <div class="set-group">
+      <label class="set-label" for="setName">卡片名稱</label>
+      <input id="setName" class="set-input" type="text" maxlength="16" placeholder="離職小卡">
+    </div>
+    <div class="set-group">
+      <label class="set-label" for="setGoal">總點數目標</label>
+      <input id="setGoal" class="set-input" type="number" min="1" max="999" inputmode="numeric">
+      <div class="goal-presets">${[30,50,100,200].map(g=>`<button class="chip goal-chip" data-g="${g}">${g}</button>`).join("")}</div>
+    </div>
+    <div class="set-group">
+      <label class="set-label">色系（點一下即時預覽）</label>
+      <div class="themes" id="themes">
+        ${THEME_ORDER.map(k=>{const t=THEMES[k];return `<div class="theme-opt${k===selTheme?' sel':''}" data-k="${k}" role="button" tabindex="0">
+          <div class="theme-dots"><span style="background:${t.bg2}"></span><span style="background:${t.accent}"></span><span style="background:${t.accent2}"></span></div>
+          <div class="theme-name">${t.name}</div></div>`;}).join("")}
+      </div>
+    </div>
+    <div class="sheet-btns"><button class="btn-cancel" id="setCancel">取消</button><button class="btn-save" id="setSave">儲存設定</button></div>`;
+  $("overlay").classList.add("show");
+  $("setName").value = s.name;
+  $("setGoal").value = s.goal;
+  function pickTheme(el){
+    selTheme = el.dataset.k;
+    $("themes").querySelectorAll(".theme-opt").forEach(x=>x.classList.remove("sel"));
+    el.classList.add("sel");
+    applyTheme(selTheme);
+  }
+  $("themes").querySelectorAll(".theme-opt").forEach(el=>{
+    el.addEventListener("click", ()=>pickTheme(el));
+    el.addEventListener("keydown", ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); pickTheme(el);} });
+  });
+  sheet.querySelectorAll(".goal-chip").forEach(b=>{ b.addEventListener("click", ()=>{ $("setGoal").value = b.dataset.g; }); });
+  $("setCancel").addEventListener("click", closeSheet);
+  $("setSave").addEventListener("click", ()=>{
+    const name = ($("setName").value.trim()) || DEFAULTS.name;
+    const goal = Math.max(1, Math.min(999, parseInt($("setGoal").value,10) || s.goal));
+    pendingRevertTheme = null; // 已儲存，不還原
+    state.settings = { name, goal, theme: selTheme };
+    save(); applyTheme(selTheme); applyMeta(); render(); closeSheet(); showToast("設定已更新");
+  });
+}
 
 function addEntry(reason){
   state.entries.push({ ts: Date.now(), reason });
   justAdded = true; save(); render();
   if(navigator.vibrate) navigator.vibrate(30);
-  if(state.entries.length >= GOAL) celebrate();
+  if(state.entries.length >= state.settings.goal) celebrate();
 }
 
 function celebrate(){
@@ -360,7 +476,7 @@ function celebrate(){
 }
 
 function buildText(){
-  let txt = "離職小卡 · 我的怨念紀錄\n共 "+state.entries.length+" 點\n\n";
+  let txt = state.settings.name+" · 我的紀錄\n共 "+state.entries.length+" 點\n\n";
   state.entries.forEach((e,i)=>{ txt += `${i+1}. [${fmtTime(e.ts)}] ${e.reason||"（沒寫原因）"}\n`; });
   return txt;
 }
@@ -370,7 +486,7 @@ function exportData(){
   try{
     const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
     const url=URL.createObjectURL(blob);
-    const a=document.createElement("a"); a.href=url; a.download="離職小卡紀錄.txt";
+    const a=document.createElement("a"); a.href=url; a.download=state.settings.name+"紀錄.txt";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000); downloaded=true;
   }catch(e){}
@@ -383,16 +499,19 @@ function exportData(){
 
 function resetAll(){
   showConfirm("全部重來？", "會清空所有紀錄、從 0 開始，無法復原。", "清空", ()=>{
-    state = { entries:[] }; save(); render(); showToast("已全部清空");
+    state = { entries:[], settings: state.settings }; save(); render(); showToast("已全部清空");
   });
 }
 
-$("addBtn").addEventListener("click", ()=>{ if(state.entries.length<GOAL) openSheet(); });
+$("addBtn").addEventListener("click", ()=>{ if(state.entries.length<state.settings.goal) openSheet(); });
 $("exportBtn").addEventListener("click", exportData);
 $("resetBtn").addEventListener("click", resetAll);
+$("settingsBtn").addEventListener("click", openSettings);
 $("overlay").addEventListener("click", e=>{ if(e.target.id==="overlay") closeSheet(); });
 $("confirmOverlay").addEventListener("click", e=>{ if(e.target.id==="confirmOverlay") closeConfirm(); });
 
+applyTheme(state.settings.theme);
+applyMeta();
 render();
 
 if("serviceWorker" in navigator){
