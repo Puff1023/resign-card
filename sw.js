@@ -1,4 +1,4 @@
-const CACHE = "resign-card-v4";
+const CACHE = "resign-card-v5";
 const ASSETS = [
   "./",
   "./index.html",
