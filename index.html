@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+<title>離職小卡</title>
+<meta name="description" content="想離職時記上一筆，滿 100 點就遞辭呈。" />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#e8f2fc" />
+<meta name="color-scheme" content="light" />
+
+<!-- iOS 加到主畫面 -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="離職小卡" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+
+<style>
+  /* 固定淡藍色系（單一主題，不跟隨系統深色模式） */
+  :root{
+    color-scheme: light;
+    --bg1:#eef5fd;
+    --bg2:#dceaf8;
+    --card:#ffffff;
+    --ink:#1e2f42;
+    --ink-soft:#5f7387;
+    --line:#cfe0f2;
+    --accent:#3a86d4;
+    --accent-deep:#2c6fbb;
+    --accent-soft:#d9ebfb;
+    --accent2:#5cc0e0;
+    --empty:#dbe8f6;
+    --fill:#3a86d4;
+    --danger:#e0574f;
+    --shadow:0 10px 30px rgba(46,92,150,.14);
+    --shadow-accent:rgba(58,134,212,.35);
+    --radius:20px;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:linear-gradient(180deg,var(--bg1) 0%,var(--bg2) 100%);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+    line-height:1.6;
+    min-height:100vh;
+    min-height:100dvh;
+    padding:
+      calc(env(safe-area-inset-top) + 20px)
+      calc(env(safe-area-inset-right) + 16px)
+      calc(env(safe-area-inset-bottom) + 20px)
+      calc(env(safe-area-inset-left) + 16px);
+    -webkit-user-select:none;user-select:none;
+  }
+  .wrap{max-width:520px;margin:0 auto;}
+
+  header{text-align:center;margin-bottom:18px;}
+  .title{font-size:26px;font-weight:800;letter-spacing:1px;margin:0;color:var(--accent-deep);}
+  .subtitle{font-size:13px;color:var(--ink-soft);margin-top:4px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .count-row{display:flex;align-items:baseline;justify-content:center;gap:6px;margin-bottom:14px;}
+  .count-big{font-size:52px;font-weight:800;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .count-slash{font-size:22px;color:var(--ink-soft);font-weight:600;}
+  .count-total{font-size:22px;color:var(--ink-soft);font-weight:700;}
+  .bar{height:12px;background:var(--empty);border-radius:99px;overflow:hidden;}
+  .bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:99px;transition:width .5s cubic-bezier(.4,1.3,.5,1);}
+  .bar-caption{font-size:12px;color:var(--ink-soft);text-align:center;margin-top:8px;}
+
+  .grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;margin-top:4px;}
+  .cell{
+    aspect-ratio:1;border-radius:8px;background:var(--empty);
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--ink-soft);cursor:default;
+    transition:transform .12s ease, background .2s ease;position:relative;
+    font-variant-numeric:tabular-nums;
+  }
+  .cell.filled{background:var(--fill);color:#fff;cursor:pointer;box-shadow:0 2px 6px var(--shadow-accent);}
+  .cell.filled:active{transform:scale(.88);}
+  .cell.next{outline:2px dashed var(--accent);outline-offset:-2px;}
+  .cell .stamp{font-size:14px;}
+  @keyframes pop{0%{transform:scale(0) rotate(-25deg);}70%{transform:scale(1.25) rotate(8deg);}100%{transform:scale(1) rotate(0);}}
+  .cell.just-added{animation:pop .45s cubic-bezier(.3,1.4,.5,1);}
+
+  .add-btn{
+    width:100%;border:none;border-radius:16px;background:var(--accent);color:#fff;
+    font-size:18px;font-weight:800;padding:16px;cursor:pointer;
+    box-shadow:0 6px 18px var(--shadow-accent);transition:transform .1s ease, opacity .2s;letter-spacing:1px;
+  }
+  .add-btn:active{transform:scale(.97);}
+  .add-btn:disabled{background:var(--accent2);box-shadow:none;cursor:default;}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 8px;text-align:center;}
+  .stat b{display:block;font-size:20px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .stat span{font-size:11px;color:var(--ink-soft);}
+
+  .recent-title{font-size:14px;font-weight:700;color:var(--ink-soft);margin:22px 4px 8px;}
+  .log{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  .log-item{display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);align-items:flex-start;}
+  .log-item:last-child{border-bottom:none;}
+  .log-num{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent-deep);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;}
+  .log-body{flex:1;min-width:0;}
+  .log-reason{font-size:14px;color:var(--ink);word-break:break-word;}
+  .log-time{font-size:11px;color:var(--ink-soft);margin-top:2px;font-variant-numeric:tabular-nums;}
+  .log-empty{padding:20px;text-align:center;color:var(--ink-soft);font-size:13px;}
+
+  .foot{display:flex;gap:10px;margin-top:18px;}
+  .foot button{flex:1;background:transparent;border:1px solid var(--line);color:var(--ink-soft);border-radius:12px;padding:10px;font-size:13px;cursor:pointer;transition:background .2s;}
+  .foot button:active{background:var(--line);}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,45,80,.45);backdrop-filter:blur(4px);display:none;align-items:flex-end;justify-content:center;z-index:50;}
+  .overlay.show{display:flex;}
+  #confirmOverlay{z-index:70;}
+  .sheet{
+    background:var(--card);width:100%;max-width:520px;border-radius:24px 24px 0 0;
+    padding:22px 20px calc(env(safe-area-inset-bottom) + 22px);
+    box-shadow:0 -10px 40px rgba(20,45,80,.2);animation:slideUp .28s cubic-bezier(.2,.9,.3,1);
+  }
+  @media (min-width:560px){
+    .overlay{align-items:center;}
+    .sheet{border-radius:24px;animation:popIn .25s cubic-bezier(.2,1.2,.4,1);}
+  }
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  @keyframes popIn{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .sheet h3{margin:0 0 4px;font-size:19px;color:var(--ink);}
+  .sheet p.hint{margin:0 0 14px;font-size:13px;color:var(--ink-soft);}
+  textarea{
+    width:100%;min-height:96px;resize:none;border:1px solid var(--line);border-radius:14px;
+    padding:14px;font-size:16px;font-family:inherit;color:var(--ink);background:var(--bg1);
+    -webkit-user-select:text;user-select:text;outline:none;
+  }
+  textarea:focus{border-color:var(--accent);}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px;}
+  .chip{border:1px solid var(--line);background:transparent;color:var(--ink-soft);border-radius:99px;padding:6px 12px;font-size:13px;cursor:pointer;transition:.15s;}
+  .chip:active,.chip.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .sheet-btns{display:flex;gap:10px;margin-top:18px;}
+  .sheet-btns button{flex:1;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:700;cursor:pointer;}
+  .btn-cancel{background:var(--line);color:var(--ink);}
+  .btn-save{background:var(--accent);color:#fff;}
+  .btn-danger{background:var(--danger);color:#fff;}
+
+  .detail-reason{font-size:15px;color:var(--ink);white-space:pre-wrap;word-break:break-word;background:var(--bg1);border-radius:12px;padding:14px;margin-bottom:6px;}
+
+  .confetti{position:fixed;top:-20px;font-size:20px;pointer-events:none;z-index:80;animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:.2;}}
+
+  .done-banner{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;text-align:center;padding:16px;border-radius:16px;margin-bottom:16px;font-weight:800;font-size:16px;}
+
+  .toast{
+    position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 24px);
+    transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;
+    padding:12px 20px;border-radius:99px;font-size:14px;font-weight:600;
+    box-shadow:0 6px 20px rgba(20,45,80,.28);opacity:0;pointer-events:none;transition:.28s;z-index:90;max-width:90vw;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  button:focus-visible,textarea:focus-visible,.cell.filled:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+  @media (prefers-reduced-motion: reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 class="title">🎫 離職小卡</h1>
+    <p class="subtitle">受夠了就記一筆，集滿 100 點就遞辭呈</p>
+  </header>
+
+  <div id="doneBanner" class="done-banner" style="display:none">🎉 已集滿 100 點，是時候遞辭呈了！</div>
+
+  <div class="card">
+    <div class="count-row">
+      <span class="count-big" id="countBig">0</span>
+      <span class="count-slash">/</span>
+      <span class="count-total">100</span>
+    </div>
+    <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+    <div class="bar-caption" id="barCaption">還差 100 點自由</div>
+  </div>
+
+  <button class="add-btn" id="addBtn">＋ 記一筆</button>
+
+  <div class="stats">
+    <div class="stat"><b id="statTotal">0</b><span>已記點數</span></div>
+    <div class="stat"><b id="statLeft">100</b><span>還差幾點</span></div>
+    <div class="stat"><b id="statDays">0</b><span>忍耐天數</span></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div style="font-size:13px;color:var(--ink-soft);margin-bottom:10px;text-align:center">👇 每一格都是一次忍耐 · 點已蓋章的格子看當時原因</div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="recent-title">最近的怨念</div>
+  <div class="log" id="log"><div class="log-empty">還沒有任何紀錄，忍住了嗎？</div></div>
+
+  <div class="foot">
+    <button id="exportBtn">匯出紀錄</button>
+    <button id="resetBtn">全部重來</button>
+  </div>
+
+  <p style="text-align:center;font-size:11px;color:var(--ink-soft);margin-top:20px">
+    資料只存在你這台裝置 · 可加到主畫面當 App
+  </p>
+</div>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="overlay" id="confirmOverlay"><div class="sheet" id="confirmSheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const KEY = "resign-card-v1";
+const GOAL = 100;
+const PRESETS = ["開會太多","老闆雷","加班","薪水太低","同事扯後腿","政策爛","被情緒勒索","通勤累","看不到未來","被當工具人"];
+
+let state = load();
+let selectedChips = new Set();
+let justAdded = false;
+let toastTimer = null;
+
+function load(){
+  try{ const d = JSON.parse(localStorage.getItem(KEY)); if(d && Array.isArray(d.entries)) return d; }catch(e){}
+  return { entries:[] };
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+const $ = id => document.getElementById(id);
+function fmtTime(ts){ const d=new Date(ts),p=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+
+/* 自製確認視窗與提示（原生 confirm/alert 在沙箱會被擋） */
+function showConfirm(title, message, okLabel, onOk){
+  const s = $("confirmSheet");
+  s.innerHTML = `<h3></h3><p class="hint"></p>
+    <div class="sheet-btns"><button class="btn-cancel" id="cfCancel">取消</button><button class="btn-danger" id="cfOk"></button></div>`;
+  s.querySelector("h3").textContent = title;
+  s.querySelector(".hint").textContent = message;
+  $("cfOk").textContent = okLabel;
+  $("confirmOverlay").classList.add("show");
+  $("cfCancel").addEventListener("click", closeConfirm);
+  $("cfOk").addEventListener("click", ()=>{ closeConfirm(); onOk(); });
+}
+function closeConfirm(){ $("confirmOverlay").classList.remove("show"); }
+function showToast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200); }
+
+function render(){
+  const n = state.entries.length, done = n >= GOAL;
+  $("countBig").textContent = Math.min(n,GOAL);
+  $("barFill").style.width = Math.min(100, n/GOAL*100) + "%";
+  $("statTotal").textContent = n;
+  $("statLeft").textContent = Math.max(0, GOAL-n);
+  let days = 0;
+  if(n>0){ days = Math.max(1, Math.ceil((Date.now()-state.entries[0].ts)/86400000)); }
+  $("statDays").textContent = days;
+  $("barCaption").textContent = done ? "自由達成 🕊️" : `還差 ${GOAL-n} 點自由`;
+  $("doneBanner").style.display = done ? "block" : "none";
+  const addBtn = $("addBtn");
+  if(done){ addBtn.disabled=true; addBtn.textContent="✅ 可以離職了"; }
+  else { addBtn.disabled=false; addBtn.textContent="＋ 記一筆"; }
+
+  const grid = $("grid"); grid.innerHTML = "";
+  for(let i=0;i<GOAL;i++){
+    const c = document.createElement("div"); c.className="cell";
+    if(i < n){
+      c.classList.add("filled"); c.innerHTML='<span class="stamp">✕</span>';
+      c.title="查看原因"; c.tabIndex=0; c.setAttribute("role","button"); c.setAttribute("aria-label",`第 ${i+1} 點，查看原因`);
+      c.addEventListener("click", ()=>showDetail(i));
+      c.addEventListener("keydown", ev=>{ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); showDetail(i);} });
+      if(i === n-1 && justAdded){ c.classList.add("just-added"); }
+    } else if(i === n && !done){ c.classList.add("next"); c.textContent=i+1; }
+    else { c.textContent=i+1; }
+    grid.appendChild(c);
+  }
+  justAdded = false;
+
+  const log = $("log");
+  if(n===0){ log.innerHTML='<div class="log-empty">還沒有任何紀錄，忍住了嗎？</div>'; }
+  else {
+    log.innerHTML="";
+    state.entries.slice().reverse().slice(0,8).forEach(e=>{
+      const idx = state.entries.indexOf(e)+1;
+      const item = document.createElement("div"); item.className="log-item";
+      item.innerHTML = `<div class="log-num">${idx}</div><div class="log-body"><div class="log-reason"></div><div class="log-time">${fmtTime(e.ts)}</div></div>`;
+      item.querySelector(".log-reason").textContent = e.reason || "（沒寫原因）";
+      log.appendChild(item);
+    });
+  }
+}
+
+function openSheet(){
+  selectedChips = new Set();
+  const sheet = $("sheet");
+  sheet.innerHTML = `<h3>這次是為了什麼？</h3><p class="hint">寫下讓你想離職的原因，之後回看很療癒。</p>
+    <textarea id="reasonInput" placeholder="例如：又被臨時改需求…" maxlength="200"></textarea>
+    <div class="chips" id="chips">${PRESETS.map(p=>`<button class="chip" data-t="${p}">${p}</button>`).join("")}</div>
+    <div class="sheet-btns"><button class="btn-cancel" id="cancelBtn">取消</button><button class="btn-save" id="saveBtn">蓋一章 ✕</button></div>`;
+  $("overlay").classList.add("show");
+  const input = $("reasonInput");
+  $("chips").querySelectorAll(".chip").forEach(ch=>{
+    ch.addEventListener("click", ()=>{
+      const t = ch.dataset.t;
+      if(selectedChips.has(t)){ selectedChips.delete(t); ch.classList.remove("on"); }
+      else { selectedChips.add(t); ch.classList.add("on"); }
+      const tags=[...selectedChips].join("、"), manual=input.dataset.manual||"";
+      input.value = manual ? (tags ? manual+" #"+[...selectedChips].join(" #") : manual) : tags;
+    });
+  });
+  input.addEventListener("input", ()=>{ input.dataset.manual = input.value.replace(/\s#.*/,""); });
+  $("cancelBtn").addEventListener("click", closeSheet);
+  $("saveBtn").addEventListener("click", ()=>{ addEntry(input.value.trim()); closeSheet(); });
+  setTimeout(()=>input.focus(), 300);
+}
+
+function showDetail(i){
+  const e = state.entries[i];
+  const sheet = $("sheet");
+  sheet.innerHTML = `<h3>第 ${i+1} 點 · 當時的怨念</h3><p class="hint">${fmtTime(e.ts)}</p>
+    <div class="detail-reason"></div>
+    <div class="sheet-btns"><button class="btn-danger" id="delBtn">刪除這筆</button><button class="btn-save" id="closeBtn">關閉</button></div>`;
+  sheet.querySelector(".detail-reason").textContent = e.reason || "（沒寫原因）";
+  $("overlay").classList.add("show");
+  $("closeBtn").addEventListener("click", closeSheet);
+  $("delBtn").addEventListener("click", ()=>{
+    showConfirm("刪除這一筆？", "刪掉後，後面的點數會往前遞補。", "刪除", ()=>{
+      state.entries.splice(i,1); save(); render(); closeSheet(); showToast("已刪除這一筆");
+    });
+  });
+}
+
+function closeSheet(){ $("overlay").classList.remove("show"); }
+
+function addEntry(reason){
+  state.entries.push({ ts: Date.now(), reason });
+  justAdded = true; save(); render();
+  if(navigator.vibrate) navigator.vibrate(30);
+  if(state.entries.length >= GOAL) celebrate();
+}
+
+function celebrate(){
+  const emojis = ["🎉","🕊️","✨","🎊","💼","🚪"];
+  for(let i=0;i<40;i++){
+    const c = document.createElement("div"); c.className="confetti"; c.textContent=emojis[i%emojis.length];
+    c.style.left = Math.random()*100+"vw";
+    c.style.animationDuration = (2+Math.random()*2)+"s";
+    c.style.animationDelay = (Math.random()*0.6)+"s";
+    document.body.appendChild(c); setTimeout(()=>c.remove(), 4500);
+  }
+  if(navigator.vibrate) navigator.vibrate([60,40,60,40,120]);
+}
+
+function buildText(){
+  let txt = "離職小卡 · 我的怨念紀錄\n共 "+state.entries.length+" 點\n\n";
+  state.entries.forEach((e,i)=>{ txt += `${i+1}. [${fmtTime(e.ts)}] ${e.reason||"（沒寫原因）"}\n`; });
+  return txt;
+}
+function exportData(){
+  if(state.entries.length===0){ showToast("還沒有任何紀錄可以匯出"); return; }
+  const txt = buildText(); let downloaded=false;
+  try{
+    const blob=new Blob([txt],{type:"text/plain;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="離職小卡紀錄.txt";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000); downloaded=true;
+  }catch(e){}
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt)
+      .then(()=>showToast(downloaded ? "已匯出，並複製到剪貼簿" : "已複製到剪貼簿"))
+      .catch(()=>showToast(downloaded ? "已匯出紀錄" : "無法匯出，請改用完整版網站"));
+  } else { showToast(downloaded ? "已匯出紀錄" : "此環境無法匯出"); }
+}
+
+function resetAll(){
+  showConfirm("全部重來？", "會清空所有紀錄、從 0 開始，無法復原。", "清空", ()=>{
+    state = { entries:[] }; save(); render(); showToast("已全部清空");
+  });
+}
+
+$("addBtn").addEventListener("click", ()=>{ if(state.entries.length<GOAL) openSheet(); });
+$("exportBtn").addEventListener("click", exportData);
+$("resetBtn").addEventListener("click", resetAll);
+$("overlay").addEventListener("click", e=>{ if(e.target.id==="overlay") closeSheet(); });
+$("confirmOverlay").addEventListener("click", e=>{ if(e.target.id==="confirmOverlay") closeConfirm(); });
+
+render();
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+</script>
+</body>
+</html>
